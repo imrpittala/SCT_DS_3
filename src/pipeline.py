@@ -280,11 +280,85 @@ def export_tree_diagram(model: Pipeline, feature_names: list, output_tree_path: 
     logger.info(f"Tree diagram exported to: {output_tree_path}")
 
 
+def export_model_evaluation_and_tree(model: Pipeline, X_test: pd.DataFrame, y_test: pd.Series, feature_names: list, output_image_path: str):
+    """
+    Exports clean, high-DPI (300 DPI) composite visualization:
+    Top: Pruned decision tree schematic (plot_tree).
+    Bottom-Left: Confusion matrix heatmap.
+    Bottom-Right: Receiver Operating Characteristic (ROC) curve with AUC score.
+    """
+    logger.info("Exporting dedicated model_evaluation_and_tree.png...")
+    set_visual_style()
+    y_pred = model.predict(X_test)
+    y_proba = model.predict_proba(X_test)[:, 1]
+    dt_classifier = model.named_steps["classifier"]
+
+    fig = plt.figure(figsize=(20, 16))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.3, 1], hspace=0.35, wspace=0.25)
+
+    fig.suptitle(
+        "Bank Marketing Term Deposit Decision Tree: Pruned Architecture & Performance Diagnostics",
+        fontsize=18,
+        fontweight="bold",
+        y=0.98
+    )
+
+    # Top Section: Pruned Decision Tree Schematic
+    ax_tree = fig.add_subplot(gs[0, :])
+    plot_tree(
+        dt_classifier,
+        feature_names=feature_names,
+        class_names=["No", "Yes"],
+        filled=True,
+        rounded=True,
+        fontsize=9,
+        max_depth=3,
+        precision=2,
+        ax=ax_tree
+    )
+    ax_tree.set_title("(a) Pruned Decision Tree Architecture (Top 3 Decision Levels)", fontsize=14, fontweight="bold", pad=12)
+
+    # Bottom-Left: Confusion Matrix Heatmap
+    ax_cm = fig.add_subplot(gs[1, 0])
+    cm = confusion_matrix(y_test, y_pred)
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        cbar=False,
+        ax=ax_cm,
+        xticklabels=["No Deposit (0)", "Subscribed (1)"],
+        yticklabels=["No Deposit (0)", "Subscribed (1)"],
+        annot_kws={"size": 13, "weight": "bold"}
+    )
+    ax_cm.set_title("(b) Test Confusion Matrix (Tuned for Recall)", fontsize=13, fontweight="bold")
+    ax_cm.set_xlabel("Predicted Label", fontweight="semibold")
+    ax_cm.set_ylabel("True Label", fontweight="semibold")
+
+    # Bottom-Right: ROC-AUC Curve
+    ax_roc = fig.add_subplot(gs[1, 1])
+    fpr, tpr, _ = roc_curve(y_test, y_proba)
+    auc_val = roc_auc_score(y_test, y_proba)
+    ax_roc.plot(fpr, tpr, color="#0d47a1", lw=3.0, label=f"Pruned Decision Tree (ROC-AUC = {auc_val:.3f})")
+    ax_roc.plot([0, 1], [0, 1], color="#9e9e9e", lw=1.8, linestyle="--", label="Random Baseline (AUC = 0.500)")
+    ax_roc.set_title(f"(c) Receiver Operating Characteristic (ROC-AUC: {auc_val:.4f})", fontsize=13, fontweight="bold")
+    ax_roc.set_xlabel("False Positive Rate (1 - Specificity)", fontweight="semibold")
+    ax_roc.set_ylabel("True Positive Rate (Sensitivity / Recall)", fontweight="semibold")
+    ax_roc.legend(loc="lower right", frameon=True, fontsize=10.5)
+
+    os.makedirs(os.path.dirname(output_image_path), exist_ok=True)
+    plt.savefig(output_image_path, dpi=300, bbox_inches="tight")
+    plt.close()
+    logger.info(f"Model evaluation and tree figure exported to: {output_image_path}")
+
+
 def main():
     """Main pipeline execution function for Decision Tree Classifier."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     data_path = os.path.join(base_dir, "data", "dataset.csv")
     report_img_path = os.path.join(base_dir, "reports", "visual_insights.png")
+    eval_tree_img_path = os.path.join(base_dir, "reports", "model_evaluation_and_tree.png")
     tree_img_path = os.path.join(base_dir, "reports", "decision_tree_structure.png")
     metrics_json_path = os.path.join(base_dir, "reports", "model_evaluation.json")
 
@@ -304,6 +378,7 @@ def main():
     metrics = evaluate_model(best_model, X_test, y_test)
     export_performance_visuals(best_model, X_test, y_test, feature_names, report_img_path)
     export_tree_diagram(best_model, feature_names, tree_img_path)
+    export_model_evaluation_and_tree(best_model, X_test, y_test, feature_names, eval_tree_img_path)
 
     with open(metrics_json_path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=4)

@@ -72,7 +72,10 @@ Evaluated on held-out test data (905 samples):
 
 ## 🖼️ Visual Insights Preview
 
-### Executive Performance Dashboard
+### Pruned Decision Tree Architecture & Model Evaluation
+![Model Evaluation and Tree Diagram](reports/model_evaluation_and_tree.png)
+
+### Executive Performance Dashboard (ROC, PR, CM & Feature Importance)
 ![Executive Performance Dashboard](reports/visual_insights.png)
 
 ### Structural Decision Tree Rules
